@@ -2,7 +2,8 @@ from collections import deque
 import numpy as np
 import os.path
 from functools import partial
-from h5py import File, Group, Dataset, special_dtype, SoftLink, ExternalLink, Reference, RegionReference, check_dtype
+from exdir import File, Group, Dataset, special_dtype, SoftLink, ExternalLink, Reference, RegionReference, check_dtype
+from exdir.plugins import numpy_attributes
 from six import raise_from, text_type, string_types, binary_type
 import warnings
 from ...container import Container
@@ -76,7 +77,7 @@ class HDF5IO(HDMFIO):
         '''
         Load cached namespaces from a file.
         '''
-        f = File(path, 'r')
+        f = File(path, 'r', plugins=[numpy_attributes])
         if SPEC_LOC_ATTR not in f.attrs:
             msg = "No cached namespaces found in %s" % path
             warnings.warn(msg)
@@ -170,8 +171,8 @@ class HDF5IO(HDMFIO):
                                                                                             'expand_refs',
                                                                                             'expand_soft',
                                                                                             kwargs)
-        source_file = File(source_filename, 'r')
-        dest_file = File(dest_filename, 'w')
+        source_file = File(source_filename, 'r', plugins=[numpy_attributes])
+        dest_file = File(dest_filename, 'w', plugins=[numpy_attributes])
         for objname in source_file["/"].keys():
             source_file.copy(source=objname,
                              dest=dest_file,
@@ -270,6 +271,7 @@ class HDF5IO(HDMFIO):
             if not (sub_h5obj is None):
                 if sub_h5obj.name in ignore:
                     continue
+                print(h5obj[k].meta)
                 link_type = h5obj.get(k, getlink=True)
                 if isinstance(link_type, SoftLink) or isinstance(link_type, ExternalLink):
                     # Reading links might be better suited in its own function
@@ -315,7 +317,6 @@ class HDF5IO(HDMFIO):
         kwargs = {
             "attributes": self.__read_attrs(h5obj),
             "dtype": h5obj.dtype,
-            "maxshape": h5obj.maxshape
         }
         for key, val in kwargs['attributes'].items():
             if isinstance(val, bytes):
@@ -397,7 +398,7 @@ class HDF5IO(HDMFIO):
                 kwargs = {'driver': 'mpio', 'comm': self.comm}
             else:
                 kwargs = {}
-            self.__file = File(self.__path, open_flag, **kwargs)
+            self.__file = File(self.__path, open_flag, allow_remove=True, plugins=[numpy_attributes], **kwargs)
 
     def close(self):
         if self.__file is not None:
@@ -820,9 +821,6 @@ class HDF5IO(HDMFIO):
         # Define the shape of the data if not provided by the user
         if 'shape' not in io_settings:
             io_settings['shape'] = data.recommended_data_shape()
-        # Define the maxshape of the data if not provided by the user
-        if 'maxshape' not in io_settings:
-            io_settings['maxshape'] = data.maxshape
         if 'dtype' not in io_settings:
             io_settings['dtype'] = data.dtype
         try:

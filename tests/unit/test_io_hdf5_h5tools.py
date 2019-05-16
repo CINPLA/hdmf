@@ -60,7 +60,11 @@ class H5IOTest(unittest.TestCase):
     def tearDown(self):
         path = self.f.filename
         self.f.close()
-        os.remove(path)
+        try:
+            os.remove(path)
+        except IsADirectoryError:
+            import shutil
+            shutil.rmtree(path)
         del self.f
         del self.test_temp_file
         self.f = None
